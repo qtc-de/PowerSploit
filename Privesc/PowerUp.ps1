@@ -1707,6 +1707,92 @@ http://forum.sysinternals.com/tip-easy-way-to-enable-privileges_topic15745.html
     }
 }
 
+
+function Get-FullControl {
+<#
+.SYNOPSIS
+
+Assigns the specified user full control over the specified file/folder.
+
+Author: Tobias Neitzel
+License: BSD 3-Clause
+Required Dependencies:
+
+.DESCRIPTION
+
+Just a simple collection of commands to assign a user full control over
+the specified file/folder. This is especially useful on members of the
+BackupOperators group. If no username is specified, assigns full control
+to the current user.
+
+.PARAMETER Path
+
+Path to the resource which gets assigned full control.
+
+.PARAMETER User
+
+Optional. Domain\User which gets full control over the specified resource.
+
+.PARAMETER Recursive
+
+Switch. If the targeted Path is a folder, set ACL inheritance.
+
+.EXAMPLE
+
+C:\> Get-FullControl -Path C:\ProgramData -User Guest
+
+Path   : Microsoft.PowerShell.Core\FileSystem::C:\ProgramData
+Owner  : NT AUTHORITY\SYSTEM
+Group  : NT AUTHORITY\SYSTEM
+Access : CREATOR OWNER Allow  268435456
+         NT AUTHORITY\SYSTEM Allow  FullControl
+         BUILTIN\Administrators Allow  FullControl
+         BUILTIN\Users Allow  ReadAndExecute, Synchronize
+         BUILTIN\Users Allow  Write
+         LAB\Guest Allow  FullControl
+Audit  :
+Sddl   : O:SYG:SYD:PAI(A;OICIIO;GA;;;CO)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)(A;CI;DCLCRPCR;;;BU)(A;;FA;;;LG)
+
+#>
+    [CmdletBinding()]
+    Param(
+        [Parameter(Position = 0, Mandatory = $True, ValueFromPipeline = $True)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Path,
+
+        [Parameter(Position = 1)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $User,
+
+        [Switch]
+        $Recursive
+    )
+
+    try {
+        if( -not $PSBoundParameters['User']) {
+            $UserIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+            $User = $UserIdentity.Name
+        }
+    } catch {
+        Write-Error "Error: Unable to get current username. Please use the -User parameter. $_"
+    }
+
+    $AclObject = Get-Acl -Path $Path
+
+    if( (Test-Path -Path $Path -PathType Container) -and $Recursive ) {
+        $AccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($user,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
+    } else {
+        $AccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($user,'FullControl','None','None','Allow')
+    }
+
+    $AclObject.AddAccessRule($AccessRule)
+    Set-Acl -Path $Path -AclObject $AclObject
+    Get-Acl -Path $Path | fl
+}
+
+
 ########################################################
 #
 # Service enumeration
